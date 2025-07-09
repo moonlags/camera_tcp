@@ -7,11 +7,11 @@ import (
 	"os"
 )
 
-var PASSWORD = os.Getenv("PASSWORD")
+var PASSWORD = os.Getenv("CAMERA_PASSWORD")
 
 func main() {
 	if PASSWORD == "" {
-		log.Fatal("PASSWORD variable is not set")
+		log.Fatal("CAMERA_PASSWORD variable is not set")
 	}
 
 	port := os.Getenv("TCP_PORT")
