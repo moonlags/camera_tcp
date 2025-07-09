@@ -36,17 +36,17 @@ func (c Client) handleConnection() {
 			break
 		}
 
-		var photoConfigs []PhotoConfig
+		var photoConfigs PhotoConfig
 		reader := bytes.NewReader(buf[len(PASSWORD):n])
 
-		if err := binary.Read(reader, binary.BigEndian, photoConfigs); err != nil {
+		if err := binary.Read(reader, binary.BigEndian, &photoConfigs); err != nil {
 			log.Printf("failed to decode binary data %s\n", err)
 			break
 		}
 
 		log.Printf("%v", photoConfigs)
 
-		if err := c.camera.queuePhotos(photoConfigs, c.conn); err != nil {
+		if err := c.camera.queuePhotos([]PhotoConfig{photoConfigs}, c.conn); err != nil {
 			log.Printf("failed to queue photos %s\n", err)
 			break
 		}

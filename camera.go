@@ -24,27 +24,27 @@ type Photo struct {
 }
 
 type PhotoConfig struct {
-	x             uint16
-	y, zoom, mode uint8
+	X             uint16
+	Y, Zoom, Mode uint8
 }
 
 func newPhoto(id uint64, c PhotoConfig, reciever net.Conn) (Photo, error) {
-	if c.x > 360 {
+	if c.X > 360 {
 		return Photo{}, errors.New("X is invalid")
-	} else if c.y > 90 {
+	} else if c.Y > 90 {
 		return Photo{}, errors.New("Y is invalid")
-	} else if c.zoom > 10 {
+	} else if c.Zoom > 10 {
 		return Photo{}, errors.New("ZOOM is invalid")
-	} else if c.mode > 13 {
+	} else if c.Mode > 13 {
 		return Photo{}, errors.New("MODE is invalid")
 	}
 
 	return Photo{
 		id:       id,
-		x:        c.x,
-		y:        c.y,
-		zoom:     c.zoom,
-		mode:     c.mode,
+		x:        c.X,
+		y:        c.Y,
+		zoom:     c.Zoom,
+		mode:     c.Mode,
 		reciever: reciever,
 	}, nil
 }
