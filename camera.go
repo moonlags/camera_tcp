@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type Photo struct {
@@ -96,6 +97,10 @@ func (c *Camera) queuePhotos(photoConfigs []PhotoConfig, reciever net.Conn) erro
 }
 
 func (c *Camera) take() (Photo, error) {
+	for len(c.queue) <= 0 {
+		time.Sleep(time.Second)
+	}
+
 	smallestDistance := math.Abs(float64(c.currentX%180 - c.queue[0].x%180))
 	nearestPhotoIndex := 0
 	for i, photo := range c.queue {
