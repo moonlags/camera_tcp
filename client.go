@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"log"
 	"net"
@@ -36,10 +37,13 @@ func (c Client) handleConnection() {
 		}
 
 		var photoConfigs []PhotoConfig
-		if _, err := binary.Decode(buf[len(PASSWORD):n], binary.BigEndian, photoConfigs); err != nil {
+		reader := bytes.NewReader(buf[len(PASSWORD):n])
+
+		if err := binary.Read(reader, binary.BigEndian, photoConfigs); err != nil {
 			log.Printf("failed to decode binary data %s\n", err)
 			break
 		}
+
 		log.Printf("%v", photoConfigs)
 
 		if err := c.camera.queuePhotos(photoConfigs, c.conn); err != nil {
