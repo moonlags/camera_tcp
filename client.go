@@ -31,7 +31,7 @@ func (c Client) handleConnection() {
 
 		log.Printf("recieved message %s\n", buf[:n])
 
-		if (n-len(PASSWORD))%int(unsafe.Sizeof(Photo{})) != 0 || string(buf[:len(PASSWORD)]) != PASSWORD {
+		if (n-len(PASSWORD))%int(unsafe.Sizeof(PhotoConfig{})) != 0 || string(buf[:len(PASSWORD)]) != PASSWORD {
 			break
 		}
 
@@ -40,6 +40,7 @@ func (c Client) handleConnection() {
 			log.Printf("failed to decode binary data %s\n", err)
 			break
 		}
+		log.Printf("%v", photoConfigs)
 
 		if err := c.camera.queuePhotos(photoConfigs, c.conn); err != nil {
 			log.Printf("failed to queue photos %s\n", err)
