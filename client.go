@@ -43,7 +43,7 @@ func (c *Client) handleConnection() {
 		}
 
 		var config PhotoConfig
-		if _, err := binary.Decode(photoData, binary.BigEndian, config); err != nil {
+		if _, err := binary.Decode(photoData, binary.BigEndian, &config); err != nil {
 			log.Println("failed to decode photo data", err)
 			break
 		}
