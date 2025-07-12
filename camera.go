@@ -1,26 +1,21 @@
 package main
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
-	"time"
 )
 
 type Photo struct {
-	id            uint64
 	x             uint16
 	y, zoom, mode uint8
 	retry         bool
-	reciever      net.Conn
-	bytes         []byte
+	output        chan []byte
 }
 
 type PhotoConfig struct {
@@ -28,7 +23,7 @@ type PhotoConfig struct {
 	Y, Zoom, Mode uint8
 }
 
-func newPhoto(id uint64, c PhotoConfig, reciever net.Conn) (Photo, error) {
+func newPhoto(c PhotoConfig, out chan []byte) (Photo, error) {
 	if c.X > 360 {
 		return Photo{}, errors.New("X is invalid")
 	} else if c.Y > 90 {
@@ -40,12 +35,11 @@ func newPhoto(id uint64, c PhotoConfig, reciever net.Conn) (Photo, error) {
 	}
 
 	return Photo{
-		id:       id,
-		x:        c.X,
-		y:        c.Y,
-		zoom:     c.Zoom,
-		mode:     c.Mode,
-		reciever: reciever,
+		x:      c.X,
+		y:      c.Y,
+		zoom:   c.Zoom,
+		mode:   c.Mode,
+		output: out,
 	}, nil
 }
 
@@ -54,7 +48,7 @@ const QUEUE_SIZE = 10
 type Camera struct {
 	currentPhotoID uint64
 	currentX       uint16
-	queue          []Photo
+	queue          chan Photo
 }
 
 func newCamera() (*Camera, error) {
@@ -64,91 +58,64 @@ func newCamera() (*Camera, error) {
 	}
 
 	return &Camera{
-		queue: make([]Photo, 0),
+		queue: make(chan Photo, QUEUE_SIZE),
 	}, nil
 }
 
-func (c *Camera) queuePhotos(photoConfigs []PhotoConfig, reciever net.Conn) error {
-	for _, config := range photoConfigs {
-		c.currentPhotoID++
+func (c *Camera) queuePhotos(config PhotoConfig, reciever net.Conn) (chan []byte, error) {
+	out := make(chan []byte)
 
-		photo, err := newPhoto(c.currentPhotoID, config, reciever)
-		if err != nil {
-			reciever.Write([]byte("error"))
-			continue
-		}
+	c.currentPhotoID++
 
-		id := make([]byte, 8)
-		binary.BigEndian.PutUint64(id, c.currentPhotoID)
-		if _, err := reciever.Write(id); err != nil {
-			return err
-		}
-
-		if len(c.queue) >= 10 {
-			if _, err := reciever.Write(id); err != nil {
-				return err
-			}
-		} else {
-			c.queue = append(c.queue, photo)
-		}
-
+	photo, err := newPhoto(config, out)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	if len(c.queue) >= QUEUE_SIZE {
+		return nil, err
+	}
+	c.queue <- photo
+
+	return out, nil
 }
 
-func (c *Camera) take() (Photo, error) {
-	for len(c.queue) <= 0 {
-		time.Sleep(time.Second)
-	}
+func (c *Camera) take(p Photo) ([]byte, error) {
+	c.setModeAndZoom(p.mode, p.zoom)
 
-	smallestDistance := math.Abs(float64(c.currentX%180 - c.queue[0].x%180))
-	nearestPhotoIndex := 0
-	for i, photo := range c.queue {
-		dist := math.Abs(float64(c.currentX%180 - photo.x%180))
-		if dist < smallestDistance {
-			smallestDistance = dist
-			nearestPhotoIndex = i
-		}
-	}
-
-	photo := c.queue[nearestPhotoIndex]
-	c.queue = append(c.queue[:nearestPhotoIndex], c.queue[nearestPhotoIndex+1:]...)
-
-	c.setModeAndZoom(photo.mode, photo.zoom)
-
-	cmd := exec.Command("./motor_driver.bin", fmt.Sprint(photo.x), fmt.Sprint(photo.y), "False", fmt.Sprint(c.currentX), "3", "wget -O photoaf.jpg http://127.0.0.1:8080/photoaf.jpg")
+	cmd := exec.Command("./motor_driver.bin", fmt.Sprint(p.x), fmt.Sprint(p.y), "False", fmt.Sprint(c.currentX), "3", "wget -O photoaf.jpg http://127.0.0.1:8080/photoaf.jpg")
 	if err := cmd.Run(); err != nil {
 		log.Printf("failed to start motor_driver %s\n", err)
 		if err := c.phoneInit(); err != nil {
 			log.Printf("failed to initialize phone %s\n", err)
 		}
-		return photo, err
+		return nil, err
 	}
 
-	c.currentX = photo.x
+	c.currentX = p.x
 
 	photoFile, err := os.Open("photoaf.jpg")
 	if err != nil {
-		return photo, err
+		return nil, err
 	}
+	defer photoFile.Close()
 
 	photoBytes, err := io.ReadAll(photoFile)
 	if err != nil {
-		return photo, err
+		return nil, err
 	}
-	photo.bytes = photoBytes
 
-	return photo, nil
+	return photoBytes, nil
 }
 
 func (c *Camera) requeuePhoto(p Photo) error {
 	if !p.retry {
 		p.retry = true
-		c.queue = append(c.queue, p)
-	} else {
-		return errors.New("photo was requeued already")
+		c.queue <- p
+		return nil
+
 	}
-	return nil
+	return errors.New("photo was requeued already")
 }
 
 func (c Camera) setModeAndZoom(mode uint8, zoom uint8) error {

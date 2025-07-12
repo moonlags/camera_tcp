@@ -1,10 +1,16 @@
 package main
 
 import (
-	"encoding/binary"
 	"log"
 	"net"
 	"os"
+)
+
+type MessageCode int
+
+const (
+	PhotoError MessageCode = iota
+	PhotoReady
 )
 
 var PASSWORD = os.Getenv("CAMERA_PASSWORD")
@@ -25,7 +31,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	log.Printf("started listening on port %s\n", port)
+	log.Println("started listening on port", port)
 
 	camera, err := newCamera()
 	if err != nil {
@@ -47,28 +53,16 @@ func main() {
 
 func photoHandler(c *Camera) {
 	for {
-		photo, err := c.take()
+		photo := <-c.queue
+
+		data, err := c.take(photo)
 		if err != nil {
 			log.Printf("failed to take photo %s\n", err)
 
-			if err := c.requeuePhoto(photo); err != nil {
+			if err := c.requeuePhoto(photo); err == nil {
 				continue
 			}
-
-			id := make([]byte, 8)
-			binary.BigEndian.PutUint64(id, photo.id)
-
-			photo.reciever.Write(id)
-			continue
 		}
-
-		sendPhoto(photo)
+		photo.output <- data
 	}
-}
-
-func sendPhoto(p Photo) {
-	id := make([]byte, 8)
-	binary.BigEndian.PutUint64(id, p.id)
-
-	p.reciever.Write(append(id, p.bytes...))
 }

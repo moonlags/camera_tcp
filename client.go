@@ -1,8 +1,9 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/binary"
+	"io"
 	"log"
 	"net"
 	"unsafe"
@@ -13,42 +14,59 @@ type Client struct {
 	camera *Camera
 }
 
-func newClient(conn net.Conn, c *Camera) Client {
-	return Client{
+func newClient(conn net.Conn, c *Camera) *Client {
+	return &Client{
 		conn, c,
 	}
 }
 
-func (c Client) handleConnection() {
+func (c *Client) handleConnection() {
 	defer c.conn.Close()
 
+	reader := bufio.NewReader(c.conn)
 	for {
-		buf := make([]byte, 256)
-		n, err := c.conn.Read(buf)
+		password := make([]byte, len(PASSWORD))
+		if _, err := io.ReadFull(reader, password); err != nil {
+			log.Println("failed to read password", err)
+			break
+		}
+
+		if string(password) != PASSWORD {
+			log.Println("password doesnt match", string(password))
+			break
+		}
+
+		photoData := make([]byte, unsafe.Sizeof(Photo{}))
+		if _, err := io.ReadFull(reader, photoData); err != nil {
+			log.Println("failed to read photo data", err)
+			break
+		}
+
+		var config PhotoConfig
+		if _, err := binary.Decode(photoData, binary.BigEndian, config); err != nil {
+			log.Println("failed to decode photo data", err)
+			break
+		}
+
+		log.Printf("%v", config)
+
+		out, err := c.camera.queuePhotos(config, c.conn)
 		if err != nil {
-			log.Printf("failed to read from socket %s\n", err)
+			log.Println("failed to queue photo", err)
+
+			c.conn.Write([]byte{byte(PhotoError)})
 			break
 		}
 
-		log.Printf("recieved message %s\n", buf[:n])
+		outData := <-out
 
-		if (n-len(PASSWORD))%int(unsafe.Sizeof(PhotoConfig{})) != 0 || string(buf[:len(PASSWORD)]) != PASSWORD {
-			break
-		}
+		buf := make([]byte, 5)
+		binary.Encode(buf, binary.BigEndian, PhotoReady)
+		binary.Encode(buf, binary.BigEndian, len(outData))
 
-		amount := (n - len(PASSWORD)/int(unsafe.Sizeof(PhotoConfig{})))
-		photoConfigs := make([]PhotoConfig, amount)
-		reader := bytes.NewReader(buf[len(PASSWORD):n])
-
-		if err := binary.Read(reader, binary.BigEndian, photoConfigs); err != nil {
-			log.Printf("failed to decode binary data %s\n", err)
-			break
-		}
-
-		log.Printf("%v", photoConfigs)
-
-		if err := c.camera.queuePhotos(photoConfigs, c.conn); err != nil {
-			log.Printf("failed to queue photos %s\n", err)
+		buf = append(buf, outData...)
+		if _, err := c.conn.Write(buf); err != nil {
+			log.Println("failed to send binary data", err)
 			break
 		}
 	}
