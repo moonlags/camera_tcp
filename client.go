@@ -36,7 +36,7 @@ func (c *Client) handleConnection() {
 			break
 		}
 
-		photoData := make([]byte, unsafe.Sizeof(Photo{}))
+		photoData := make([]byte, unsafe.Sizeof(PhotoConfig{}))
 		if _, err := io.ReadFull(reader, photoData); err != nil {
 			log.Println("failed to read photo data", err)
 			break
