@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"unsafe"
 )
 
 type Client struct {
@@ -36,14 +35,8 @@ func (c *Client) handleConnection() {
 			break
 		}
 
-		photoData := make([]byte, unsafe.Sizeof(PhotoConfig{}))
-		if _, err := io.ReadFull(reader, photoData); err != nil {
-			log.Println("failed to read photo data", err)
-			break
-		}
-
 		var config PhotoConfig
-		if _, err := binary.Decode(photoData, binary.BigEndian, &config); err != nil {
+		if err := binary.Read(reader, binary.BigEndian, &config); err != nil {
 			log.Println("failed to decode photo data", err)
 			break
 		}
@@ -62,7 +55,7 @@ func (c *Client) handleConnection() {
 
 		buf := make([]byte, 5)
 		binary.Encode(buf, binary.BigEndian, PhotoReady)
-		binary.Encode(buf, binary.BigEndian, len(outData))
+		binary.Encode(buf, binary.BigEndian, int32(len(outData)))
 
 		buf = append(buf, outData...)
 		if _, err := c.conn.Write(buf); err != nil {

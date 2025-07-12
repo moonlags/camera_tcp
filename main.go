@@ -6,10 +6,8 @@ import (
 	"os"
 )
 
-type MessageCode int
-
 const (
-	PhotoError MessageCode = iota
+	PhotoError uint8 = iota
 	PhotoReady
 )
 
