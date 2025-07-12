@@ -29,6 +29,7 @@ func (c *Client) handleConnection() {
 			log.Println("failed to read password", err)
 			break
 		}
+		log.Println("recieved password", string(password))
 
 		if string(password) != PASSWORD {
 			log.Println("password doesnt match", string(password))
