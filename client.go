@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/binary"
 	"io"
 	"log"
@@ -22,14 +21,13 @@ func newClient(conn net.Conn, c *Camera) *Client {
 func (c *Client) handleConnection() {
 	defer c.conn.Close()
 
-	reader := bufio.NewReader(c.conn)
 	for {
 		password := make([]byte, len(PASSWORD))
-		if _, err := io.ReadFull(reader, password); err != nil {
+		if _, err := io.ReadFull(c.conn, password); err != nil {
 			log.Println("failed to read password", err)
 			break
 		}
-		log.Println("recieved password", string(password))
+		log.Println("recieved password", string(password), len(password))
 
 		if string(password) != PASSWORD {
 			log.Println("password doesnt match", string(password))
@@ -37,7 +35,7 @@ func (c *Client) handleConnection() {
 		}
 
 		var config PhotoConfig
-		if err := binary.Read(reader, binary.BigEndian, &config); err != nil {
+		if err := binary.Read(c.conn, binary.BigEndian, &config); err != nil {
 			log.Println("failed to decode photo data", err)
 			break
 		}
