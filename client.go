@@ -52,13 +52,18 @@ func (c *Client) handleConnection() {
 
 		outData := <-out
 
-		buf := make([]byte, 5)
-		binary.Encode(buf, binary.BigEndian, PhotoReady)
-		binary.Encode(buf, binary.BigEndian, int32(len(outData)))
+		if _, err := c.conn.Write([]byte{byte(PhotoReady)}); err != nil {
+			log.Println("failed to write message code", err)
+			break
+		}
 
-		buf = append(buf, outData...)
-		if _, err := c.conn.Write(buf); err != nil {
-			log.Println("failed to send binary data", err)
+		if err := binary.Write(c.conn, binary.BigEndian, int32(len(outData))); err != nil {
+			log.Println("failed to write outData lenght", err)
+			break
+		}
+
+		if _, err := c.conn.Write(outData); err != nil {
+			log.Println("failed to write outData", err)
 			break
 		}
 	}
