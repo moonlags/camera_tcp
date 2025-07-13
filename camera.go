@@ -94,21 +94,20 @@ func (c *Camera) take(p Photo) ([]byte, error) {
 
 	c.currentX = p.x
 
-	photoFile, err := os.Open("photoaf.jpg")
+	resp, err := http.DefaultClient.Get("http://127.0.0.1:8080/photoaf.jpg")
 	if err != nil {
-		log.Println("failed to open photo file", err)
+		log.Println("failed to request photo", err)
 		if err2 := c.phoneInit(); err2 != nil {
 			log.Printf("failed to initialize phone %s\n", err2)
 		}
 		return nil, err
 	}
-	defer photoFile.Close()
+	defer resp.Body.Close()
 
-	photoBytes, err := io.ReadAll(photoFile)
+	photoBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	os.Remove("photoaf.jpg")
 
 	return photoBytes, nil
 }
@@ -149,6 +148,7 @@ func sendCommand(x uint16, y, init, motorOff uint8) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	msg := fmt.Sprintf("%d %d %d %d", x, y, init, motorOff)
 	_, err = conn.Write([]byte(msg))
