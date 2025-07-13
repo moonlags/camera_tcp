@@ -45,6 +45,8 @@ func newPhoto(c PhotoConfig, out chan []byte) (Photo, error) {
 
 const QUEUE_SIZE = 10
 
+var DRIVER_ADDRESS = os.Getenv("DRIVER_ADDRESS")
+
 type Camera struct {
 	currentPhotoID uint64
 	currentX       uint16
@@ -52,8 +54,11 @@ type Camera struct {
 }
 
 func newCamera() (*Camera, error) {
-	cmd := exec.Command("./motor_driver.bin", "0", "0", "True", "0", "3", "")
-	if err := cmd.Run(); err != nil {
+	if DRIVER_ADDRESS == "" {
+		log.Fatal("DRIVER_ADDRESS variable is not set")
+	}
+
+	if err := sendCommand(0, 0, 1, 1); err != nil {
 		return nil, err
 	}
 
@@ -83,12 +88,7 @@ func (c *Camera) queuePhotos(config PhotoConfig, reciever net.Conn) (chan []byte
 func (c *Camera) take(p Photo) ([]byte, error) {
 	c.setModeAndZoom(p.mode, p.zoom)
 
-	cmd := exec.Command("./motor_driver.bin", fmt.Sprint(p.x), fmt.Sprint(p.y), "False", fmt.Sprint(c.currentX), "3", "wget -O photoaf.jpg http://127.0.0.1:8080/photoaf.jpg")
-	if err := cmd.Run(); err != nil {
-		log.Printf("failed to start motor_driver %s\n", err)
-		if err := c.phoneInit(); err != nil {
-			log.Printf("failed to initialize phone %s\n", err)
-		}
+	if err := sendCommand(p.x, p.y, 0, 0); err != nil {
 		return nil, err
 	}
 
@@ -96,6 +96,10 @@ func (c *Camera) take(p Photo) ([]byte, error) {
 
 	photoFile, err := os.Open("photoaf.jpg")
 	if err != nil {
+		log.Println("failed to open photo file", err)
+		if err2 := c.phoneInit(); err2 != nil {
+			log.Printf("failed to initialize phone %s\n", err2)
+		}
 		return nil, err
 	}
 	defer photoFile.Close()
@@ -104,6 +108,7 @@ func (c *Camera) take(p Photo) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	os.Remove("photoaf.jpg")
 
 	return photoBytes, nil
 }
@@ -137,4 +142,15 @@ func (c Camera) phoneInit() error {
 		return err
 	}
 	return nil
+}
+
+func sendCommand(x uint16, y, init, motorOff uint8) error {
+	conn, err := net.Dial("tcp", DRIVER_ADDRESS)
+	if err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("%d %d %d %d", x, y, init, motorOff)
+	_, err = conn.Write([]byte(msg))
+	return err
 }

@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 const (
@@ -51,16 +52,19 @@ func main() {
 
 func photoHandler(c *Camera) {
 	for {
-		photo := <-c.queue
+		select {
+		case photo := <-c.queue:
+			data, err := c.take(photo)
+			if err != nil {
+				log.Printf("failed to take photo %s\n", err)
 
-		data, err := c.take(photo)
-		if err != nil {
-			log.Printf("failed to take photo %s\n", err)
-
-			if err := c.requeuePhoto(photo); err == nil {
-				continue
+				if err := c.requeuePhoto(photo); err == nil {
+					continue
+				}
 			}
+			photo.output <- data
+		case <-time.After(time.Second * 10):
+			sendCommand(c.currentX, 0, 0, 1)
 		}
-		photo.output <- data
 	}
 }
