@@ -49,9 +49,9 @@ const QUEUE_SIZE = 10
 var DRIVER_ADDRESS = os.Getenv("DRIVER_ADDRESS")
 
 type Camera struct {
-	currentPhotoID uint64
-	currentX       uint16
-	queue          chan Photo
+	currentX  uint16
+	queue     chan Photo
+	turnedOff bool
 }
 
 func newCamera() (*Camera, error) {
@@ -68,10 +68,8 @@ func newCamera() (*Camera, error) {
 	}, nil
 }
 
-func (c *Camera) queuePhotos(config PhotoConfig, reciever net.Conn) (chan []byte, error) {
+func (c *Camera) queuePhotos(config PhotoConfig) (chan []byte, error) {
 	out := make(chan []byte)
-
-	c.currentPhotoID++
 
 	photo, err := newPhoto(config, out)
 	if err != nil {
@@ -92,7 +90,7 @@ func (c *Camera) take(p Photo) ([]byte, error) {
 	if err := sendCommand(p.x, p.y, 0, 0); err != nil {
 		return nil, err
 	}
-
+	c.turnedOff = false
 	c.currentX = p.x
 
 	resp, err := http.DefaultClient.Get("http://127.0.0.1:8080/photoaf.jpg")

@@ -42,7 +42,7 @@ func (c *Client) handleConnection() {
 
 		log.Printf("%v", config)
 
-		out, err := c.camera.queuePhotos(config, c.conn)
+		out, err := c.camera.queuePhotos(config)
 		if err != nil {
 			log.Println("failed to queue photo", err)
 

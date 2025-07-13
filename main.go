@@ -64,7 +64,10 @@ func photoHandler(c *Camera) {
 			}
 			photo.output <- data
 		case <-time.After(time.Minute):
-			sendCommand(c.currentX, 0, 0, 1)
+			if !c.turnedOff {
+				sendCommand(c.currentX, 0, 0, 1)
+				c.turnedOff = true
+			}
 		}
 	}
 }
