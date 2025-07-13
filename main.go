@@ -63,7 +63,7 @@ func photoHandler(c *Camera) {
 				}
 			}
 			photo.output <- data
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Minute):
 			sendCommand(c.currentX, 0, 0, 1)
 		}
 	}

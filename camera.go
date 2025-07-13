@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type Photo struct {
@@ -152,5 +153,18 @@ func sendCommand(x uint16, y, init, motorOff uint8) error {
 
 	msg := fmt.Sprintf("%d %d %d %d", x, y, init, motorOff)
 	_, err = conn.Write([]byte(msg))
-	return err
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, 128)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return err
+	}
+
+	log.Println("message from driver", string(buf[:n]))
+	time.Sleep(time.Second * 3)
+
+	return nil
 }
