@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"time"
 )
@@ -46,8 +45,6 @@ func newPhoto(c PhotoConfig, out chan []byte) (Photo, error) {
 
 const QUEUE_SIZE = 10
 
-var DRIVER_ADDRESS = os.Getenv("DRIVER_ADDRESS")
-
 type Camera struct {
 	currentX  uint16
 	queue     chan Photo
@@ -55,16 +52,13 @@ type Camera struct {
 }
 
 func newCamera() (*Camera, error) {
-	if DRIVER_ADDRESS == "" {
-		log.Fatal("DRIVER_ADDRESS variable is not set")
-	}
-
 	if err := sendCommand(0, 0, 1, 1); err != nil {
 		return nil, err
 	}
 
 	return &Camera{
-		queue: make(chan Photo, QUEUE_SIZE),
+		queue:     make(chan Photo, QUEUE_SIZE),
+		turnedOff: true,
 	}, nil
 }
 

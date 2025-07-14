@@ -12,6 +12,11 @@ const (
 	PhotoReady
 )
 
+const (
+	PORT           = ":54321"
+	DRIVER_ADDRESS = "127.0.0.1:8000"
+)
+
 var PASSWORD = os.Getenv("CAMERA_PASSWORD")
 
 func main() {
@@ -19,18 +24,13 @@ func main() {
 		log.Fatal("CAMERA_PASSWORD variable is not set")
 	}
 
-	port := os.Getenv("TCP_PORT")
-	if port == "" {
-		log.Fatal("TCP_PORT variable is not set")
-	}
-
-	listener, err := net.Listen("tcp", ":"+port)
+	listener, err := net.Listen("tcp", PORT)
 	if err != nil {
-		log.Fatalf("failed to start listening on port %s: %v", port, err)
+		log.Fatalf("failed to start listening on port %s: %v", PORT, err)
 	}
 	defer listener.Close()
 
-	log.Println("started listening on port", port)
+	log.Println("started listening on port", PORT)
 
 	camera, err := newCamera()
 	if err != nil {
